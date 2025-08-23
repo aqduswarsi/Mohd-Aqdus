@@ -117,10 +117,21 @@
         "enable_transparent_header_collection": false,
         "collection_color_scheme": "default"
       }
+    },
+    "gift_guide_banner_MD4BHe": {
+      "type": "gift-guide-banner",
+      "name": "Gift Guide Banner",
+      "settings": {
+        "heading": "Discover Joy: Your Ultimate Holiday Gift Destination.",
+        "subheading": "Find the ideal gift for your loved ones.",
+        "button_label": "Choose Gift",
+        "button_link": "shopify://collections/all"
+      }
     }
   },
   "order": [
     "header_announcements_9jGBFp",
-    "header_section"
+    "header_section",
+    "gift_guide_banner_MD4BHe"
   ]
 }
