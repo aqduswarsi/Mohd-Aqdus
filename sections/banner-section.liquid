@@ -19,13 +19,13 @@ Custom Banner section
     {% endif %}
 
     <div class="c-banner__cta">
-      {% if section.settings.primary_text != blank and section.settings.primary_link != blank %}
+      {% if section.settings.primary_text != blank %}
         <a href="{{ section.settings.primary_link }}" class="c-btn c-btn--primary">
           <span>{{ section.settings.primary_text }}</span>
         </a>
       {% endif %}
 
-      {% if section.settings.secondary_text != blank and section.settings.secondary_link != blank %}
+      {% if section.settings.secondary_text != blank %}
         <a href="{{ section.settings.secondary_link }}" class="c-btn c-btn--ghost">
           <span>{{ section.settings.secondary_text }}</span>
         </a>
@@ -42,44 +42,26 @@ Custom Banner section
     text-align: center;
   }
   .c-banner__inner { max-width: 1100px; width: 100%; }
-  .c-banner__kicker {
-    letter-spacing: .12em;
-    font-weight: 600;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-    opacity: .8;
-  }
-  .c-banner__heading {
-    font-size: clamp(28px, 5vw, 56px);
-    line-height: 1.1;
-    margin: 8px 0 12px;
-  }
-  .c-banner__sub {
-    font-size: clamp(14px, 2.2vw, 18px);
-    opacity: .9;
-    margin: 0 auto 24px;
-    max-width: 720px;
-  }
+  .c-banner__kicker { letter-spacing: .12em; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; opacity: .8; }
+  .c-banner__heading { font-size: clamp(28px, 5vw, 56px); line-height: 1.1; margin: 8px 0 12px; }
+  .c-banner__sub { font-size: clamp(14px, 2.2vw, 18px); opacity: .9; margin: 0 auto 24px; max-width: 720px; }
   .c-banner__cta { display: inline-flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
-  /* Buttons + animation */
   .c-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    padding: 12px 22px;
-    font-weight: 600;
-    border: 2px solid currentColor;
-    text-decoration: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px; padding: 12px 22px; font-weight: 600;
+    border: 2px solid currentColor; text-decoration: none;
     transition: transform .18s ease, box-shadow .25s ease, background .25s ease, color .25s ease;
     will-change: transform;
   }
   .c-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,0,0,.18); }
-  .c-btn--primary { background: {{ section.settings.primary_bg | default: '#111111' }}; color: {{ section.settings.primary_fg | default: '#ffffff' }}; border-color: transparent; }
-  .c-btn--ghost   { background: transparent; color: {{ section.settings.ghost_fg | default: '#111111' }}; }
+  .c-btn--primary {
+    background: {{ section.settings.primary_bg | default: "#111111" }};
+    color: {{ section.settings.primary_fg | default: "#ffffff" }};
+    border-color: transparent;
+  }
+  .c-btn--ghost { background: transparent; color: {{ section.settings.ghost_fg | default: "#111111" }}; }
 
-  /* micro “press” + subtle float on hover */
   .c-btn:hover { transform: translateY(-2px) scale(1.02); }
   .c-btn:active { transform: translateY(0) scale(.98); }
 </style>
@@ -93,12 +75,12 @@ Custom Banner section
     { "type": "text", "id": "subheading", "label": "Subheading", "default": "Cozy layers, clean silhouettes and technical fabrics for everyday comfort." },
 
     { "type": "text", "id": "primary_text", "label": "Primary button text", "default": "Shop Now" },
-    { "type": "url",  "id": "primary_link", "label": "Primary button link", "default": "/collections/all" },
+    { "type": "url",  "id": "primary_link", "label": "Primary button link", "default": "" },
     { "type": "color","id": "primary_bg",   "label": "Primary button background", "default": "#111111" },
-    { "type": "color","id": "primary_fg",   "label": "Primary button text",       "default": "#ffffff" },
+    { "type": "color","id": "primary_fg",   "label": "Primary button text", "default": "#ffffff" },
 
     { "type": "text", "id": "secondary_text", "label": "Secondary button text", "default": "Learn More" },
-    { "type": "url",  "id": "secondary_link", "label": "Secondary button link", "default": "/pages/about" },
+    { "type": "url",  "id": "secondary_link", "label": "Secondary button link", "default": "" },
     { "type": "color","id": "ghost_fg",       "label": "Secondary button color", "default": "#111111" }
   ],
   "presets": [{ "name": "Banner (Custom)" }]
