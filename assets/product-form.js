@@ -130,16 +130,17 @@ class ProductFormComponent extends Component {
       .then(response => {
         if (response.status) {
           this.dispatchEvent(new CartErrorEvent(form.id || '', response.message, response.description, response.errors));
-          if (!addToCartTextError) return;
-          addToCartTextError.classList.remove('hidden');
-          const textNode = addToCartTextError.childNodes[2];
-          if (textNode) textNode.textContent = response.message;
-          else addToCartTextError.appendChild(document.createTextNode(response.message));
-          this.#setLiveRegionText(response.message);
-          this.#timeout = setTimeout(() => {
-            addToCartTextError?.classList.add('hidden');
-            this.#clearLiveRegionText();
-          }, 10000);
+          if (addToCartTextError) {
+            addToCartTextError.classList.remove('hidden');
+            const textNode = addToCartTextError.childNodes[2];
+            if (textNode) textNode.textContent = response.message;
+            else addToCartTextError.appendChild(document.createTextNode(response.message));
+            this.#setLiveRegionText(response.message);
+            this.#timeout = setTimeout(() => {
+              addToCartTextError?.classList.add('hidden');
+              this.#clearLiveRegionText();
+            }, 10000);
+          }
           this.dispatchEvent(new CartAddEvent({}, this.id, {
             didError: true,
             source: 'product-form-component',
@@ -170,6 +171,7 @@ class ProductFormComponent extends Component {
         }));
 
         // ✅ Auto-add Soft Winter Jacket (Black + M)
+        const selectedVariantId = this.refs.variantId.value;
         const selects = Array.from(form.querySelectorAll('select')).filter(s => s.name.includes('options['));
         let selectedSize = '', selectedColor = '';
         selects.forEach(s => {
@@ -228,7 +230,7 @@ if (!customElements.get('product-form-component')) {
 }
 
 /**
- * Premium FlyToCart Animation
+ * FlyToCart Animation
  */
 class FlyToCart extends HTMLElement {
   source;
@@ -237,7 +239,30 @@ class FlyToCart extends HTMLElement {
   connectedCallback() { this.#animate(); }
 
   #animate() {
-    const rect = this.getBoundingClientRect();
     const sourceRect = this.source.getBoundingClientRect();
     const destinationRect = this.destination.getBoundingClientRect();
-    const offset = {
+    const flyEl = this;
+
+    flyEl.style.position = 'fixed';
+    flyEl.style.top = `${sourceRect.top}px`;
+    flyEl.style.left = `${sourceRect.left}px`;
+    flyEl.style.width = `${sourceRect.width}px`;
+    flyEl.style.height = `${sourceRect.height}px`;
+    flyEl.style.backgroundSize = 'cover';
+    flyEl.style.transition = 'all 0.6s ease-in-out';
+    document.body.appendChild(flyEl);
+
+    requestAnimationFrame(() => {
+      flyEl.style.top = `${destinationRect.top}px`;
+      flyEl.style.left = `${destinationRect.left}px`;
+      flyEl.style.width = `${destinationRect.width}px`;
+      flyEl.style.height = `${destinationRect.height}px`;
+    });
+
+    flyEl.addEventListener('transitionend', () => flyEl.remove(), { once: true });
+  }
+}
+
+if (!customElements.get('fly-to-cart')) {
+  customElements.define('fly-to-cart', FlyToCart);
+}
