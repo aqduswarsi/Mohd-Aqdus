@@ -210,7 +210,7 @@ class ProductFormComponent extends Component {
           sections: response.sections,
         }));
 
-        // Enhanced Auto-add Logic
+        // Enhanced Auto-add Logic with Better Debugging
         console.log('🎯 === AUTO-ADD LOGIC START ===');
         
         let selectedColor = '';
@@ -218,75 +218,143 @@ class ProductFormComponent extends Component {
         
         // Method 1: Get from variant data (most reliable)
         const currentVariantId = id;
+        console.log('🔗 Current variant ID being added:', currentVariantId);
+        console.log('🔍 Checking window.product availability:', !!window.product);
+        console.log('🔍 Checking window.product.variants availability:', !!window.product?.variants);
+        
         if (currentVariantId && window.product?.variants) {
           const currentVariant = window.product.variants.find(v => v.id == currentVariantId);
+          console.log('🎯 Found variant:', currentVariant);
+          
           if (currentVariant && currentVariant.options) {
             console.log('🔍 Using variant data for detection');
-            console.log('Variant options:', currentVariant.options);
+            console.log('📋 Product options names:', window.product.options);
+            console.log('📋 Variant options values:', currentVariant.options);
             
             if (window.product.options) {
               window.product.options.forEach((optionName, index) => {
                 const optionValue = currentVariant.options[index];
-                console.log(`Option ${index}: ${optionName} = ${optionValue}`);
+                console.log(`📝 Option ${index}: "${optionName}" = "${optionValue}"`);
                 
-                if (optionName.toLowerCase().includes('color') || optionName.toLowerCase().includes('colour')) {
+                const optionNameLower = optionName.toLowerCase();
+                if (optionNameLower.includes('color') || optionNameLower.includes('colour')) {
                   selectedColor = optionValue;
+                  console.log('🎨 Color detected from options:', selectedColor);
                 }
-                if (optionName.toLowerCase().includes('size')) {
+                if (optionNameLower.includes('size')) {
                   selectedSize = optionValue;
+                  console.log('📏 Size detected from options:', selectedSize);
                 }
               });
             } else {
               // Fallback: assume first is color, second is size
               selectedColor = currentVariant.options[0] || '';
               selectedSize = currentVariant.options[1] || '';
+              console.log('🔄 Using fallback option order - Color:', selectedColor, 'Size:', selectedSize);
             }
+          } else {
+            console.log('❌ No variant found or no options available');
           }
+        } else {
+          console.log('❌ No variant ID or no product variants available');
         }
         
-        // Method 2: Fallback to form data
+        // Method 2: Direct variant ID mapping (since we know the specific IDs)
         if (!selectedColor || !selectedSize) {
-          console.log('🔄 Falling back to form data');
+          console.log('🔄 Using direct variant ID mapping');
+          
+          // Map known variant IDs to their color/size combinations
+          const variantMap = {
+            '42822037536846': { color: 'Black', size: 'M' },
+            '42822037405774': { color: 'Black', size: 'XS' },
+            // Add more mappings as needed
+          };
+          
+          const mappedVariant = variantMap[currentVariantId];
+          if (mappedVariant) {
+            selectedColor = mappedVariant.color;
+            selectedSize = mappedVariant.size;
+            console.log('✅ Found variant in mapping:', mappedVariant);
+          } else {
+            console.log('❌ Variant ID not found in mapping:', currentVariantId);
+            console.log('💡 Available mapped variants:', Object.keys(variantMap));
+          }
+        }
+        
+        // Method 3: Fallback to form data if both methods failed
+        if (!selectedColor || !selectedSize) {
+          console.log('🔄 Falling back to form data analysis');
+          console.log('📋 All form data entries:');
           for (let [key, value] of formData.entries()) {
-            if ((key.toLowerCase().includes('color') || key.toLowerCase().includes('colour')) && !selectedColor) {
+            console.log(`  "${key}" = "${value}"`);
+            const keyLower = key.toLowerCase();
+            if ((keyLower.includes('color') || keyLower.includes('colour')) && !selectedColor) {
               selectedColor = value;
+              console.log('🎨 Color found in form data:', selectedColor);
             }
-            if (key.toLowerCase().includes('size') && !selectedSize) {
+            if (keyLower.includes('size') && !selectedSize) {
               selectedSize = value;
+              console.log('📏 Size found in form data:', selectedSize);
             }
           }
         }
         
-        console.log('🎨 Final detected color:', `"${selectedColor}"`);
-        console.log('📏 Final detected size:', `"${selectedSize}"`);
+        console.log('🎨 FINAL detected color:', `"${selectedColor}" (type: ${typeof selectedColor})`);
+        console.log('📏 FINAL detected size:', `"${selectedSize}" (type: ${typeof selectedSize})`);
         
-        // Auto-add conditions
+        // Auto-add conditions with extensive debugging
         const softWinterJacketVariantId = '42822036684878';
+        console.log('🎯 Target jacket variant ID:', softWinterJacketVariantId);
         
-        // Test multiple condition combinations
+        // Test multiple condition combinations with detailed logging
         const conditions = [
-          { color: 'Black', size: 'M' },
-          { color: 'black', size: 'm' },
-          { color: 'Black', size: 'Medium' },
-          { color: 'black', size: 'medium' }
+          { color: 'Black', size: 'M', desc: 'Exact: Black + M' },
+          { color: 'black', size: 'm', desc: 'Lowercase: black + m' },
+          { color: 'Black', size: 'Medium', desc: 'Full: Black + Medium' },
+          { color: 'black', size: 'medium', desc: 'Lowercase full: black + medium' },
+          { color: 'BLACK', size: 'M', desc: 'Uppercase: BLACK + M' },
+          { color: 'BLACK', size: 'MEDIUM', desc: 'All uppercase: BLACK + MEDIUM' }
         ];
         
         let shouldAutoAdd = false;
-        conditions.forEach(condition => {
-          const colorMatch = selectedColor?.toLowerCase().trim() === condition.color.toLowerCase();
-          const sizeMatch = selectedSize?.toLowerCase().trim() === condition.size.toLowerCase();
-          if (colorMatch && sizeMatch) {
+        let matchedCondition = null;
+        
+        console.log('🧪 Testing all conditions:');
+        conditions.forEach((condition, index) => {
+          const selectedColorTrimmed = (selectedColor || '').toString().trim();
+          const selectedSizeTrimmed = (selectedSize || '').toString().trim();
+          const conditionColorTrimmed = condition.color.trim();
+          const conditionSizeTrimmed = condition.size.trim();
+          
+          const colorMatch = selectedColorTrimmed.toLowerCase() === conditionColorTrimmed.toLowerCase();
+          const sizeMatch = selectedSizeTrimmed.toLowerCase() === conditionSizeTrimmed.toLowerCase();
+          const bothMatch = colorMatch && sizeMatch;
+          
+          console.log(`  ${index + 1}. ${condition.desc}:`);
+          console.log(`     Color: "${selectedColorTrimmed}" vs "${conditionColorTrimmed}" = ${colorMatch}`);
+          console.log(`     Size: "${selectedSizeTrimmed}" vs "${conditionSizeTrimmed}" = ${sizeMatch}`);
+          console.log(`     Overall match: ${bothMatch ? '✅' : '❌'}`);
+          
+          if (bothMatch && !shouldAutoAdd) {
             shouldAutoAdd = true;
-            console.log(`✅ Match found: ${condition.color} + ${condition.size}`);
+            matchedCondition = condition;
+            console.log(`🎉 FIRST MATCH FOUND: ${condition.desc}`);
           }
         });
         
-        if (shouldAutoAdd) {
-          console.log('🎉 AUTO-ADD TRIGGERED! Adding Soft Winter Jacket...');
+        if (shouldAutoAdd && matchedCondition) {
+          console.log('🚀 AUTO-ADD TRIGGERED! Adding Soft Winter Jacket...');
+          console.log('🎯 Matched condition:', matchedCondition.desc);
           
           const fd = new FormData();
           fd.append('id', softWinterJacketVariantId);
           fd.append('quantity', '1');
+          
+          console.log('📦 Sending auto-add request with data:', {
+            id: fd.get('id'),
+            quantity: fd.get('quantity'),
+            url: Theme.routes.cart_add_url
+          });
           
           fetch(Theme.routes.cart_add_url, { 
             ...fetchCfg, 
@@ -295,21 +363,51 @@ class ProductFormComponent extends Component {
           })
           .then(res => {
             console.log('📡 Auto-add response status:', res.status);
+            console.log('📡 Auto-add response ok:', res.ok);
             if (!res.ok) {
-              throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+              return res.text().then(text => {
+                console.error('❌ Auto-add failed - Response text:', text);
+                throw new Error(`HTTP ${res.status}: ${res.statusText} - ${text}`);
+              });
             }
             return res.json();
           })
           .then(res => {
-            console.log('✅ Soft Winter Jacket auto-added successfully:', res);
+            console.log('✅ Soft Winter Jacket auto-added successfully!');
+            console.log('📦 Auto-add response:', res);
+            
+            // Dispatch a custom event to update cart UI if needed
+            if (res && !res.status) {
+              console.log('🔄 Dispatching cart update event');
+              document.dispatchEvent(new CustomEvent('cart:updated', { 
+                detail: { 
+                  autoAdded: true, 
+                  variantId: softWinterJacketVariantId,
+                  response: res 
+                } 
+              }));
+            }
           })
           .catch(err => {
-            console.error('❌ Auto-add failed:', err);
+            console.error('❌ Auto-add failed with error:');
+            console.error(err);
+            console.error('❌ Error details:', {
+              name: err.name,
+              message: err.message,
+              stack: err.stack
+            });
           });
         } else {
-          console.log('❌ Auto-add conditions not met');
-          console.log('💡 Need: Black color AND M/Medium size');
-          console.log(`💡 Got: Color="${selectedColor}" AND Size="${selectedSize}"`);
+          console.log('❌ AUTO-ADD CONDITIONS NOT MET');
+          console.log('💡 Required: Black color AND M/Medium size (case insensitive)');
+          console.log(`💡 Received: Color="${selectedColor}" AND Size="${selectedSize}"`);
+          console.log('💡 Make sure you select exactly Black + M or Black + Medium');
+          
+          // Show what would trigger the auto-add
+          console.log('💡 Conditions that would trigger auto-add:');
+          conditions.forEach(condition => {
+            console.log(`   - ${condition.desc}`);
+          });
         }
         
         console.log('🎯 === AUTO-ADD LOGIC END ===');
