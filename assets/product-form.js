@@ -88,6 +88,7 @@ class ProductFormComponent extends Component {
   requiredRefs = ['variantId', 'liveRegion'];
   #abortController = new AbortController();
   #timeout;
+  #autoAddInProgress = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -120,6 +121,210 @@ class ProductFormComponent extends Component {
     this.#abortController.abort();
   }
 
+  // Enhanced product page detection
+  #isProductContext() {
+    // Method 1: Check URL patterns
+    const productUrlPattern = window.location.pathname.includes('/products/');
+    
+    // Method 2: Check for product-specific elements and data
+    const hasProductForm = document.querySelector('.product-form, [data-product-form]') !== null;
+    const hasProductData = this.dataset.productId && this.dataset.productId !== '';
+    const hasProductJson = window.product && Object.keys(window.product).length > 0;
+    
+    // Method 3: Check for collection context where auto-add should work
+    const isCollectionContext = window.location.pathname.includes('/collections/') && hasProductData;
+    const isSearchContext = window.location.pathname.includes('/search') && hasProductData;
+    const isQuickBuyContext = this.closest('.quick-add-modal, .quick-buy, [data-quick-buy]') !== null;
+    
+    // Method 4: Check for cart/checkout exclusions
+    const isCartPage = window.location.pathname.includes('/cart');
+    const isCheckoutPage = window.location.pathname.includes('/checkout');
+    
+    const shouldRunAutoAdd = (productUrlPattern || isCollectionContext || isSearchContext || isQuickBuyContext) 
+                           && hasProductData 
+                           && !isCartPage 
+                           && !isCheckoutPage;
+
+    console.log('🏪 Product context analysis:', {
+      productUrlPattern,
+      hasProductForm,
+      hasProductData,
+      hasProductJson,
+      isCollectionContext,
+      isSearchContext,
+      isQuickBuyContext,
+      isCartPage,
+      isCheckoutPage,
+      shouldRunAutoAdd,
+      currentURL: window.location.pathname,
+      productId: this.dataset.productId
+    });
+
+    return shouldRunAutoAdd;
+  }
+
+  // Enhanced variant detection
+  #getVariantDetails(variantId, formData) {
+    let selectedColor = '';
+    let selectedSize = '';
+    
+    console.log('🔍 Starting variant detection for ID:', variantId);
+    
+    // Method 1: Get from variant data (most reliable)
+    if (variantId && window.product?.variants) {
+      const currentVariant = window.product.variants.find(v => v.id == variantId);
+      console.log('🎯 Found variant:', currentVariant);
+      
+      if (currentVariant?.options) {
+        console.log('🔍 Using variant data for detection');
+        console.log('📋 Product options names:', window.product.options);
+        console.log('📋 Variant options values:', currentVariant.options);
+        
+        if (window.product.options) {
+          window.product.options.forEach((optionName, index) => {
+            const optionValue = currentVariant.options[index];
+            console.log(`📝 Option ${index}: "${optionName}" = "${optionValue}"`);
+            
+            const optionNameLower = optionName.toLowerCase();
+            if (optionNameLower.includes('color') || optionNameLower.includes('colour')) {
+              selectedColor = optionValue;
+              console.log('🎨 Color detected from options:', selectedColor);
+            }
+            if (optionNameLower.includes('size')) {
+              selectedSize = optionValue;
+              console.log('📏 Size detected from options:', selectedSize);
+            }
+          });
+        } else {
+          // Fallback: assume first is color, second is size
+          selectedColor = currentVariant.options[0] || '';
+          selectedSize = currentVariant.options[1] || '';
+          console.log('🔄 Using fallback option order - Color:', selectedColor, 'Size:', selectedSize);
+        }
+      }
+    }
+
+    // Method 2: Enhanced variant ID mapping
+    if (!selectedColor || !selectedSize) {
+      console.log('🔄 Using enhanced variant ID mapping');
+      
+      const variantMap = {
+        '42822037536846': { color: 'Black', size: 'M' },      // Black + M  
+        '42822037405774': { color: 'Black', size: 'XS' },     // Black + XS
+        // Add your other variant mappings here
+        // Format: 'VARIANT_ID': { color: 'COLOR_NAME', size: 'SIZE_NAME' }
+      };
+      
+      const mappedVariant = variantMap[variantId];
+      if (mappedVariant) {
+        selectedColor = mappedVariant.color;
+        selectedSize = mappedVariant.size;
+        console.log('✅ Found variant in mapping:', mappedVariant);
+      } else {
+        console.log('❌ Variant ID not found in mapping:', variantId);
+        console.log('💡 Add this to variantMap:', `'${variantId}': { color: '?', size: '?' }`);
+      }
+    }
+
+    // Method 3: Form data analysis
+    if ((!selectedColor || !selectedSize) && formData) {
+      console.log('🔄 Analyzing form data');
+      for (let [key, value] of formData.entries()) {
+        const keyLower = key.toLowerCase();
+        if ((keyLower.includes('color') || keyLower.includes('colour')) && !selectedColor) {
+          selectedColor = value;
+          console.log('🎨 Color found in form data:', selectedColor);
+        }
+        if (keyLower.includes('size') && !selectedSize) {
+          selectedSize = value;
+          console.log('📏 Size found in form data:', selectedSize);
+        }
+      }
+    }
+
+    return { selectedColor, selectedSize };
+  }
+
+  // Enhanced auto-add logic
+  async #processAutoAdd(variantId, formData) {
+    if (this.#autoAddInProgress) {
+      console.log('⚠️ Auto-add already in progress, skipping...');
+      return;
+    }
+
+    const { selectedColor, selectedSize } = this.#getVariantDetails(variantId, formData);
+    
+    console.log('🎨 FINAL detected color:', `"${selectedColor}" (type: ${typeof selectedColor})`);
+    console.log('📏 FINAL detected size:', `"${selectedSize}" (type: ${typeof selectedSize})`);
+    
+    // Auto-add conditions
+    const softWinterJacketVariantId = '42822036684878';
+    const targetConditions = [
+      { color: 'Black', size: 'M', desc: 'Black + M' },
+      { color: 'Black', size: 'Medium', desc: 'Black + Medium' }
+    ];
+    
+    const shouldAutoAdd = targetConditions.some(condition => {
+      const colorMatch = selectedColor.toLowerCase().trim() === condition.color.toLowerCase().trim();
+      const sizeMatch = selectedSize.toLowerCase().trim() === condition.size.toLowerCase().trim();
+      return colorMatch && sizeMatch;
+    });
+
+    if (!shouldAutoAdd) {
+      console.log('❌ AUTO-ADD CONDITIONS NOT MET');
+      console.log(`💡 Required: Black + (M or Medium), Got: ${selectedColor} + ${selectedSize}`);
+      return;
+    }
+
+    console.log('🚀 AUTO-ADD TRIGGERED! Adding Soft Winter Jacket...');
+    this.#autoAddInProgress = true;
+
+    try {
+      const autoAddFormData = new FormData();
+      autoAddFormData.append('id', softWinterJacketVariantId);
+      autoAddFormData.append('quantity', '1');
+      
+      const response = await fetch(Theme.routes.cart_add_url, {
+        method: 'POST',
+        body: autoAddFormData,
+        headers: { 
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.status) {
+        console.error('❌ Auto-add error:', result.message, result.description);
+      } else {
+        console.log('✅ Soft Winter Jacket auto-added successfully!');
+        
+        // Dispatch custom event for cart updates
+        document.dispatchEvent(new CustomEvent('cart:updated', { 
+          detail: { 
+            autoAdded: true, 
+            variantId: softWinterJacketVariantId,
+            response: result 
+          } 
+        }));
+      }
+    } catch (error) {
+      console.error('❌ Auto-add failed:', error);
+    } finally {
+      // Clear flag after delay
+      setTimeout(() => {
+        this.#autoAddInProgress = false;
+        console.log('🔄 Auto-add flag cleared');
+      }, 2000);
+    }
+  }
+
   handleSubmit(event) {
     console.log('🚀 === FORM SUBMIT DEBUG ===');
     console.log('🎯 Event type:', event.type);
@@ -134,10 +339,8 @@ class ProductFormComponent extends Component {
     console.log('📤 Variant input element value:', this.refs.variantId?.value);
     console.log('📤 Current URL:', window.location.pathname);
     
-    // Only run auto-add logic if we're on a product page, not cart page
-    const isProductPage = window.location.pathname.includes('/products/') || 
-                         document.querySelector('.product-form, [data-product-form]') !== null;
-    console.log('🏪 Is product page:', isProductPage);
+    const isProductContext = this.#isProductContext();
+    console.log('🏪 Is product context:', isProductContext);
     
     // Check if the submitted ID matches any known variant
     if (window.product?.variants) {
@@ -219,241 +422,14 @@ class ProductFormComponent extends Component {
           sections: response.sections,
         }));
 
-        // Only run auto-add logic on product pages, not on cart operations
-        if (!isProductPage) {
-          console.log('🚫 Skipping auto-add - not on product page');
+        // Enhanced auto-add logic
+        if (!isProductContext) {
+          console.log('🚫 Skipping auto-add - not in valid product context');
           return;
         }
 
-        // Enhanced Auto-add Logic with Better Debugging
         console.log('🎯 === AUTO-ADD LOGIC START ===');
-        
-        let selectedColor = '';
-        let selectedSize = '';
-        
-        // Method 1: Get from variant data (most reliable)
-        const currentVariantId = id;
-        console.log('🔗 Current variant ID being added:', currentVariantId);
-        console.log('🔍 Checking window.product availability:', !!window.product);
-        console.log('🔍 Checking window.product.variants availability:', !!window.product?.variants);
-        
-        if (currentVariantId && window.product?.variants) {
-          const currentVariant = window.product.variants.find(v => v.id == currentVariantId);
-          console.log('🎯 Found variant:', currentVariant);
-          
-          if (currentVariant && currentVariant.options) {
-            console.log('🔍 Using variant data for detection');
-            console.log('📋 Product options names:', window.product.options);
-            console.log('📋 Variant options values:', currentVariant.options);
-            
-            if (window.product.options) {
-              window.product.options.forEach((optionName, index) => {
-                const optionValue = currentVariant.options[index];
-                console.log(`📝 Option ${index}: "${optionName}" = "${optionValue}"`);
-                
-                const optionNameLower = optionName.toLowerCase();
-                if (optionNameLower.includes('color') || optionNameLower.includes('colour')) {
-                  selectedColor = optionValue;
-                  console.log('🎨 Color detected from options:', selectedColor);
-                }
-                if (optionNameLower.includes('size')) {
-                  selectedSize = optionValue;
-                  console.log('📏 Size detected from options:', selectedSize);
-                }
-              });
-            } else {
-              // Fallback: assume first is color, second is size
-              selectedColor = currentVariant.options[0] || '';
-              selectedSize = currentVariant.options[1] || '';
-              console.log('🔄 Using fallback option order - Color:', selectedColor, 'Size:', selectedSize);
-            }
-          } else {
-            console.log('❌ No variant found or no options available');
-          }
-        } else {
-          console.log('❌ No variant ID or no product variants available');
-        }
-        
-        // Method 2: Direct variant ID mapping (since we know the specific IDs)
-        if (!selectedColor || !selectedSize) {
-          console.log('🔄 Using direct variant ID mapping');
-          
-          // Map known variant IDs to their color/size combinations
-          // IMPORTANT: Update these with your actual variant IDs
-          const variantMap = {
-            '42822037536846': { color: 'Black', size: 'M' },      // Black + M  
-            '42822037405774': { color: 'Black', size: 'XS' },     // Black + XS
-            // Add more mappings for other variants as needed
-            // To find variant IDs: check console when selecting different options
-          };
-          
-          console.log('🗺️ Checking variant map for ID:', currentVariantId);
-          console.log('🗺️ Available mappings:', Object.keys(variantMap));
-          
-          const mappedVariant = variantMap[currentVariantId];
-          if (mappedVariant) {
-            selectedColor = mappedVariant.color;
-            selectedSize = mappedVariant.size;
-            console.log('✅ Found variant in mapping:', mappedVariant);
-          } else {
-            console.log('❌ Variant ID not found in mapping:', currentVariantId);
-            console.log('💡 Add this to variantMap if needed:', `'${currentVariantId}': { color: '?', size: '?' }`);
-          }
-        }
-        
-        // Method 3: Fallback to form data if both methods failed
-        if (!selectedColor || !selectedSize) {
-          console.log('🔄 Falling back to form data analysis');
-          console.log('📋 All form data entries:');
-          for (let [key, value] of formData.entries()) {
-            console.log(`  "${key}" = "${value}"`);
-            const keyLower = key.toLowerCase();
-            if ((keyLower.includes('color') || keyLower.includes('colour')) && !selectedColor) {
-              selectedColor = value;
-              console.log('🎨 Color found in form data:', selectedColor);
-            }
-            if (keyLower.includes('size') && !selectedSize) {
-              selectedSize = value;
-              console.log('📏 Size found in form data:', selectedSize);
-            }
-          }
-        }
-        
-        console.log('🎨 FINAL detected color:', `"${selectedColor}" (type: ${typeof selectedColor})`);
-        console.log('📏 FINAL detected size:', `"${selectedSize}" (type: ${typeof selectedSize})`);
-        
-        // Auto-add conditions with extensive debugging
-        const softWinterJacketVariantId = '42822036684878';
-        console.log('🎯 Target jacket variant ID:', softWinterJacketVariantId);
-        
-        // Test multiple condition combinations with detailed logging
-        const conditions = [
-          { color: 'Black', size: 'M', desc: 'Exact: Black + M' },
-          { color: 'black', size: 'm', desc: 'Lowercase: black + m' },
-          { color: 'Black', size: 'Medium', desc: 'Full: Black + Medium' },
-          { color: 'black', size: 'medium', desc: 'Lowercase full: black + medium' },
-          { color: 'BLACK', size: 'M', desc: 'Uppercase: BLACK + M' },
-          { color: 'BLACK', size: 'MEDIUM', desc: 'All uppercase: BLACK + MEDIUM' }
-        ];
-        
-        let shouldAutoAdd = false;
-        let matchedCondition = null;
-        
-        console.log('🧪 Testing all conditions:');
-        conditions.forEach((condition, index) => {
-          const selectedColorTrimmed = (selectedColor || '').toString().trim();
-          const selectedSizeTrimmed = (selectedSize || '').toString().trim();
-          const conditionColorTrimmed = condition.color.trim();
-          const conditionSizeTrimmed = condition.size.trim();
-          
-          const colorMatch = selectedColorTrimmed.toLowerCase() === conditionColorTrimmed.toLowerCase();
-          const sizeMatch = selectedSizeTrimmed.toLowerCase() === conditionSizeTrimmed.toLowerCase();
-          const bothMatch = colorMatch && sizeMatch;
-          
-          console.log(`  ${index + 1}. ${condition.desc}:`);
-          console.log(`     Color: "${selectedColorTrimmed}" vs "${conditionColorTrimmed}" = ${colorMatch}`);
-          console.log(`     Size: "${selectedSizeTrimmed}" vs "${conditionSizeTrimmed}" = ${sizeMatch}`);
-          console.log(`     Overall match: ${bothMatch ? '✅' : '❌'}`);
-          
-          if (bothMatch && !shouldAutoAdd) {
-            shouldAutoAdd = true;
-            matchedCondition = condition;
-            console.log(`🎉 FIRST MATCH FOUND: ${condition.desc}`);
-          }
-        });
-        
-        if (shouldAutoAdd && matchedCondition) {
-          console.log('🚀 AUTO-ADD TRIGGERED! Adding Soft Winter Jacket...');
-          console.log('🎯 Matched condition:', matchedCondition.desc);
-          
-          // Add a flag to prevent duplicate auto-adds
-          if (window.autoAddInProgress) {
-            console.log('⚠️ Auto-add already in progress, skipping...');
-            return;
-          }
-          
-          window.autoAddInProgress = true;
-          
-          const fd = new FormData();
-          fd.append('id', softWinterJacketVariantId);
-          fd.append('quantity', '1');
-          
-          console.log('📦 Sending auto-add request with data:', {
-            id: fd.get('id'),
-            quantity: fd.get('quantity'),
-            url: Theme.routes.cart_add_url
-          });
-          
-          // Use a simpler fetch approach for the auto-add
-          fetch(Theme.routes.cart_add_url, { 
-            method: 'POST',
-            body: fd,
-            headers: { 
-              'Accept': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest'
-            }
-          })
-          .then(res => {
-            console.log('📡 Auto-add response status:', res.status);
-            console.log('📡 Auto-add response ok:', res.ok);
-            
-            if (!res.ok) {
-              return res.text().then(text => {
-                console.error('❌ Auto-add failed - Response text:', text);
-                throw new Error(`HTTP ${res.status}: ${res.statusText} - ${text}`);
-              });
-            }
-            return res.json();
-          })
-          .then(res => {
-            console.log('✅ Soft Winter Jacket auto-added successfully!');
-            console.log('📦 Auto-add response:', res);
-            
-            // Check if there was an error in the response
-            if (res.status) {
-              console.error('❌ Auto-add error:', res.message, res.description);
-            } else {
-              console.log('🎉 Auto-add completed successfully!');
-              
-              // Dispatch a custom event to update cart UI if needed
-              document.dispatchEvent(new CustomEvent('cart:updated', { 
-                detail: { 
-                  autoAdded: true, 
-                  variantId: softWinterJacketVariantId,
-                  response: res 
-                } 
-              }));
-            }
-          })
-          .catch(err => {
-            console.error('❌ Auto-add failed with error:');
-            console.error(err);
-            console.error('❌ Error details:', {
-              name: err.name,
-              message: err.message,
-              stack: err.stack
-            });
-          })
-          .finally(() => {
-            // Clear the flag after a delay
-            setTimeout(() => {
-              window.autoAddInProgress = false;
-              console.log('🔄 Auto-add flag cleared');
-            }, 2000);
-          });
-        } else {
-          console.log('❌ AUTO-ADD CONDITIONS NOT MET');
-          console.log('💡 Required: Black color AND M/Medium size (case insensitive)');
-          console.log(`💡 Received: Color="${selectedColor}" AND Size="${selectedSize}"`);
-          console.log('💡 Make sure you select exactly Black + M or Black + Medium');
-          
-          // Show what would trigger the auto-add
-          console.log('💡 Conditions that would trigger auto-add:');
-          conditions.forEach(condition => {
-            console.log(`   - ${condition.desc}`);
-          });
-        }
-        
+        this.#processAutoAdd(id, formData);
         console.log('🎯 === AUTO-ADD LOGIC END ===');
       })
       .catch(err => console.error(err))
@@ -553,7 +529,7 @@ if (!customElements.get('fly-to-cart')) {
   customElements.define('fly-to-cart', FlyToCart);
 }
 
-// Add this helper function to your browser console for manual testing:
+// Enhanced debugging helper
 window.checkCurrentVariant = function() {
   const form = document.querySelector('product-form-component form');
   const variantInput = form?.querySelector('input[name="id"]');
@@ -572,7 +548,18 @@ window.checkCurrentVariant = function() {
     }
   }
   
-  // Also check what variants are available
+  // Check context
+  const productForm = document.querySelector('product-form-component');
+  if (productForm) {
+    console.log('Product context check:', {
+      isProductUrl: window.location.pathname.includes('/products/'),
+      hasProductId: !!productForm.dataset.productId,
+      isCollection: window.location.pathname.includes('/collections/'),
+      currentUrl: window.location.pathname
+    });
+  }
+  
+  // Show all available variants
   if (window.product?.variants) {
     console.log('All available variants:');
     window.product.variants.forEach(v => {
@@ -580,3 +567,10 @@ window.checkCurrentVariant = function() {
     });
   }
 };
+
+// Add debugging for cart updates
+document.addEventListener('cart:updated', (event) => {
+  if (event.detail.autoAdded) {
+    console.log('🛒 Cart updated via auto-add:', event.detail);
+  }
+});
