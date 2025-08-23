@@ -117,14 +117,14 @@ class ProductFormComponent extends Component {
     const cartItemComponentsSectionIds = [];
     cartItemsComponents.forEach(item => {
       if (item.dataset.sectionId) cartItemComponentsSectionIds.push(item.dataset.sectionId);
+      formData.append('sections', cartItemComponentsSectionIds.join(','));
     });
-    formData.append('sections', cartItemComponentsSectionIds.join(','));
 
     const fetchCfg = fetchConfig('javascript', { body: formData });
 
     fetch(Theme.routes.cart_add_url, {
       ...fetchCfg,
-      headers: { ...fetchCfg.headers, Accept: 'application/json' },
+      headers: { ...fetchCfg.headers, Accept: 'text/html' },
     })
       .then(res => res.json())
       .then(response => {
@@ -150,6 +150,9 @@ class ProductFormComponent extends Component {
           return;
         }
 
+        const id = formData.get('id');
+        if (!id) throw new Error('Form ID is required');
+
         addToCartTextError?.classList.add('hidden');
         addToCartTextError?.removeAttribute('aria-live');
 
@@ -160,28 +163,24 @@ class ProductFormComponent extends Component {
           setTimeout(() => this.#clearLiveRegionText(), 5000);
         }
 
-        this.dispatchEvent(new CartAddEvent({}, formData.get('id').toString(), {
+        this.dispatchEvent(new CartAddEvent({}, id.toString(), {
           source: 'product-form-component',
           itemCount: Number(formData.get('quantity')) || Number(this.dataset.quantityDefault),
           productId: this.dataset.productId,
           sections: response.sections,
         }));
 
-        // ✅ Auto-add Soft Winter Jacket (M / Black)
-        const selects = Array.from(form.querySelectorAll('select')).filter(s => s.name.includes('options['));
-        let selectedSize = '', selectedColor = '';
-        selects.forEach(s => {
-          const name = s.name.toLowerCase();
-          if (name.includes('size')) selectedSize = s.value;
-          if (name.includes('color')) selectedColor = s.value;
-        });
+        // ✅ Auto-add Soft Winter Jacket (Black + M)
+        const colorRadio = form.querySelector('input[type="radio"][name^="Color"]:checked');
+        const sizeRadio = form.querySelector('input[type="radio"][name^="Size"]:checked');
+        const selectedColor = colorRadio ? colorRadio.value : '';
+        const selectedSize = sizeRadio ? sizeRadio.value : '';
 
-        const softWinterJacketVariantId = '42822036684878';
+        const softWinterJacketVariantId = '42822036684878'; // ✅ Correct variant ID
         if (selectedColor === 'Black' && selectedSize === 'M') {
           const fd = new FormData();
           fd.append('id', softWinterJacketVariantId);
           fd.append('quantity', '1');
-
           fetch(Theme.routes.cart_add_url, { ...fetchCfg, body: fd, headers: { ...fetchCfg.headers, Accept: 'application/json' } })
             .then(res => res.json())
             .then(res => console.log('Soft Winter Jacket auto-added', res))
