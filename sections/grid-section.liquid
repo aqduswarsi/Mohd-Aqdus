@@ -1,0 +1,240 @@
+{% comment %}
+Custom Grid section
+- Six product pickers from the customizer
+- Click card => popup with name/price/description/variants
+- Add to Cart via /cart/add.js (vanilla fetch)
+- If chosen variant is Black + Medium => also add Soft Winter Jacket (upsell product chosen in settings)
+- Fully responsive, no jQuery
+{% endcomment %}
+
+<section class="c-grid" role="region" aria-label="Featured products">
+  <div class="c-grid__wrap">
+    {%- assign handles = '' -%}
+    {%- for i in (1..6) -%}
+      {%- assign id = 'product_' | append: i -%}
+      {%- assign p = section.settings[id] -%}
+      {%- if p != blank -%}
+        {%- assign handles = handles | append: all_products[p].handle | append: ',' -%}
+        <article class="c-card" data-handle="{{ all_products[p].handle }}" tabindex="0" aria-label="{{ all_products[p].title }}">
+          <div class="c-card__media">
+            {%- if all_products[p].featured_image -%}
+              <img loading="lazy" src="{{ all_products[p].featured_image | img_url: '600x' }}" alt="{{ all_products[p].title | escape }}">
+            {%- endif -%}
+          </div>
+          <div class="c-card__body">
+            <h3 class="c-card__title">{{ all_products[p].title }}</h3>
+            {%- assign first_variant = all_products[p].variants.first -%}
+            <p class="c-card__price">
+              {{ first_variant.price | money }}
+              {%- if all_products[p].price_varies -%}<span class="c-card__from">+</span>{%- endif -%}
+            </p>
+            <button class="c-card__btn" data-handle="{{ all_products[p].handle }}" type="button">View</button>
+          </div>
+        </article>
+      {%- endif -%}
+    {%- endfor -%}
+  </div>
+
+  <!-- Popup shell (in-DOM once) -->
+  <div id="pd-popup" class="pd-popup is-hidden" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="pd-popup__overlay" data-close></div>
+    <div class="pd-popup__panel" role="document">
+      <button class="pd-popup__close" type="button" aria-label="Close" data-close>&times;</button>
+      <div class="pd-popup__content" id="pd-popup-content">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .c-grid { padding: 48px 16px; }
+  .c-grid__wrap {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) { .c-grid__wrap { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .c-grid__wrap { grid-template-columns: 1fr; } }
+
+  .c-card { border: 1px solid rgba(0,0,0,.08); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
+  .c-card__media img { width: 100%; height: auto; display: block; }
+  .c-card__body { padding: 14px; display: grid; gap: 6px; }
+  .c-card__title { margin: 0; font-size: 16px; line-height: 1.3; }
+  .c-card__price { margin: 0; opacity: .9; }
+  .c-card__btn {
+    margin-top: 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #111; color: #fff; border: none;
+    cursor: pointer;
+    transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .c-card__btn:hover { transform: translateY(-1px); }
+  .c-card__btn:active { transform: translateY(0); }
+
+  /* Popup */
+  .pd-popup { position: fixed; inset: 0; display: grid; place-items: center; z-index: 50; }
+  .pd-popup.is-hidden { display: none; }
+  .pd-popup__overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+  .pd-popup__panel {
+    position: relative; background: #fff; width: min(800px, 92vw);
+    max-height: 90vh; overflow: auto; border-radius: 16px; padding: 18px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  }
+  .pd-popup__close {
+    position: absolute; top: 8px; right: 10px; border: 0; background: transparent; font-size: 28px; line-height: 1; cursor: pointer;
+  }
+  .pd-product {
+    display: grid; gap: 18px; grid-template-columns: 1fr 1fr; align-items: start;
+  }
+  .pd-product__media img { width: 100%; height: auto; border-radius: 12px; }
+  .pd-product__title { margin: 0 0 6px; font-size: 22px; }
+  .pd-product__desc { font-size: 14px; opacity: .9; }
+  .pd-product__price { font-weight: 600; margin: 8px 0 12px; }
+  .pd-actions { display: grid; gap: 10px; }
+  .pd-actions select, .pd-actions button {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,.12);
+  }
+  .pd-actions button {
+    background: #111; color: #fff; border: none; cursor: pointer; font-weight: 600;
+    transition: transform .15s ease, background .2s ease;
+  }
+  .pd-actions button:hover { transform: translateY(-1px); }
+  .pd-actions button:active { transform: translateY(0); }
+  @media (max-width: 760px){ .pd-product { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const popup = document.getElementById('pd-popup');
+  const popupContent = document.getElementById('pd-popup-content');
+
+  // Open popup handler (delegated)
+  document.querySelector('.c-grid__wrap')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.c-card__btn');
+    if (!btn) return;
+    const handle = btn.dataset.handle;
+    try {
+      const res = await fetch(`/products/${handle}.js`);
+      const product = await res.json();
+      renderPopup(product);
+      showPopup();
+    } catch (err) {
+      console.error('Product fetch failed', err);
+    }
+  });
+
+  // Close popup
+  popup.addEventListener('click', (e) => {
+    if (e.target.hasAttribute('data-close') || e.target.classList.contains('pd-popup__close')) {
+      hidePopup();
+    }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hidePopup(); });
+
+  function showPopup(){ popup.classList.remove('is-hidden'); popup.setAttribute('aria-hidden','false'); }
+  function hidePopup(){ popup.classList.add('is-hidden'); popup.setAttribute('aria-hidden','true'); popupContent.innerHTML = ''; }
+
+  function money(cents, currency){
+    // Shopify JS returns cents; we format with store money_format if needed.
+    // Simple fallback:
+    return (cents/100).toLocaleString(undefined, { style: 'currency', currency: (currency || '{{ shop.currency }}') });
+  }
+
+  function renderPopup(product){
+    const firstImg = product.images?.[0] || product.featured_image;
+    const price = product.price || product.variants?.[0]?.price;
+    const desc = product.description?.replace(/<[^>]*>/g,'').slice(0, 220) + (product.description && product.description.length > 220 ? '…' : '');
+
+    const options = product.variants.map(v => {
+      const available = v.available ? '' : ' (Sold out)';
+      return `<option value="${v.id}" data-title="${v.title}" ${v.available ? '' : 'disabled'}>
+        ${v.title}${available}
+      </option>`;
+    }).join('');
+
+    popupContent.innerHTML = `
+      <div class="pd-product" data-handle="${product.handle}">
+        <div class="pd-product__media">
+          ${firstImg ? `<img src="${firstImg}" alt="${product.title}">` : ''}
+        </div>
+        <div class="pd-product__info">
+          <h2 class="pd-product__title">${product.title}</h2>
+          <div class="pd-product__price">${money(price, product.currency)}</div>
+          <p class="pd-product__desc">${desc || ''}</p>
+
+          <div class="pd-actions">
+            <label for="pd-variant">Choose variant</label>
+            <select id="pd-variant">
+              ${options}
+            </select>
+            <button id="pd-add">ADD TO CART</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Add to cart
+    const addBtn = popupContent.querySelector('#pd-add');
+    addBtn.addEventListener('click', async () => {
+      const select = popupContent.querySelector('#pd-variant');
+      const variantId = select.value;
+      const variantTitle = select.options[select.selectedIndex].dataset.title || '';
+
+      // 1) Add selected product
+      await fetch('/cart/add.js', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ id: Number(variantId), quantity: 1 })
+      });
+
+      // 2) If variant is Black + Medium => auto add Soft Winter Jacket (upsell)
+      const isBlackMedium = /\bBlack\b/i.test(variantTitle) && /\bMedium\b/i.test(variantTitle);
+      if (isBlackMedium) {
+        const upsellHandle = "{{ all_products[section.settings.upsell_product].handle | default: '' }}";
+        if (upsellHandle) {
+          try {
+            const uRes = await fetch(`/products/${upsellHandle}.js`);
+            const uProd = await uRes.json();
+            // Prefer a variant that also matches default options (first available as fallback)
+            const uVariant = uProd.variants.find(v => v.available) || uProd.variants[0];
+            if (uVariant?.id) {
+              await fetch('/cart/add.js', {
+                method: 'POST',
+                headers: { 'Content-Type':'application/json' },
+                body: JSON.stringify({ id: Number(uVariant.id), quantity: 1 })
+              });
+            }
+          } catch (e) { console.warn('Upsell add failed', e); }
+        }
+      }
+
+      // Optional: give user feedback (you can swap to mini-cart open if your theme supports it)
+      hidePopup();
+      window.dispatchEvent(new Event('cart:refresh')); // harmless custom event
+      alert('Added to cart');
+    }, { once: true });
+  }
+});
+</script>
+
+{% schema %}
+{
+  "name": "Grid (Custom)",
+  "settings": [
+    { "type": "product", "id": "product_1", "label": "Product 1" },
+    { "type": "product", "id": "product_2", "label": "Product 2" },
+    { "type": "product", "id": "product_3", "label": "Product 3" },
+    { "type": "product", "id": "product_4", "label": "Product 4" },
+    { "type": "product", "id": "product_5", "label": "Product 5" },
+    { "type": "product", "id": "product_6", "label": "Product 6" },
+
+    { "type": "header", "content": "Auto-add rule" },
+    { "type": "product", "id": "upsell_product", "label": "Soft Winter Jacket (upsell product)", "info": "Will be auto-added when selected variant is Black + Medium" }
+  ],
+  "presets": [{ "name": "Grid (Custom)" }]
+}
+{% endschema %}

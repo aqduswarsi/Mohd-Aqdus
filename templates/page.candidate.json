@@ -1,0 +1,14 @@
+{
+  "name": "Candidate Test Page",
+  "sections": {
+    "banner": {
+      "type": "banner-section",
+      "settings": {}
+    },
+    "grid": {
+      "type": "grid-section",
+      "settings": {}
+    }
+  },
+  "order": ["banner", "grid"]
+}
