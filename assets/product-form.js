@@ -171,7 +171,6 @@ class ProductFormComponent extends Component {
         }));
 
         // ✅ Auto-add Soft Winter Jacket (Black + M)
-        const selectedVariantId = this.refs.variantId.value;
         const selects = Array.from(form.querySelectorAll('select')).filter(s => s.name.includes('options['));
         let selectedSize = '', selectedColor = '';
         selects.forEach(s => {
