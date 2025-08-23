@@ -1,5 +1,22 @@
 {
   "sections": {
+    "banner": {
+      "type": "banner-custom",
+      "settings": {
+        "kicker": "New Arrival",
+        "heading": "Welcome to Our Store",
+        "subheading": "Discover our latest products and offers",
+        "primary_text": "Shop Now",
+        "primary_link": "/collections/all",
+        "primary_bg": "#111111",
+        "primary_fg": "#ffffff",
+        "secondary_text": "Learn More",
+        "secondary_link": "/pages/about-us",
+        "ghost_fg": "#111111"
+      },
+      "blocks": {},
+      "block_order": []
+    },
     "main": {
       "type": "main-page",
       "blocks": {
@@ -49,6 +66,7 @@
     }
   },
   "order": [
+    "banner",
     "main"
   ]
 }
