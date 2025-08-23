@@ -122,6 +122,9 @@ class ProductFormComponent extends Component {
 
   handleSubmit(event) {
     console.log('🚀 === FORM SUBMIT DEBUG ===');
+    console.log('🎯 Event type:', event.type);
+    console.log('🎯 Event target:', event.target);
+    console.log('🎯 Form submission source:', this.closest('.shopify-section')?.id || 'unknown');
     
     const form = this.querySelector('form');
     const formData = new FormData(form);
@@ -129,6 +132,12 @@ class ProductFormComponent extends Component {
     
     console.log('📤 Submitted variant ID:', submittedVariantId);
     console.log('📤 Variant input element value:', this.refs.variantId?.value);
+    console.log('📤 Current URL:', window.location.pathname);
+    
+    // Only run auto-add logic if we're on a product page, not cart page
+    const isProductPage = window.location.pathname.includes('/products/') || 
+                         document.querySelector('.product-form, [data-product-form]') !== null;
+    console.log('🏪 Is product page:', isProductPage);
     
     // Check if the submitted ID matches any known variant
     if (window.product?.variants) {
@@ -210,6 +219,12 @@ class ProductFormComponent extends Component {
           sections: response.sections,
         }));
 
+        // Only run auto-add logic on product pages, not on cart operations
+        if (!isProductPage) {
+          console.log('🚫 Skipping auto-add - not on product page');
+          return;
+        }
+
         // Enhanced Auto-add Logic with Better Debugging
         console.log('🎯 === AUTO-ADD LOGIC START ===');
         
@@ -264,11 +279,16 @@ class ProductFormComponent extends Component {
           console.log('🔄 Using direct variant ID mapping');
           
           // Map known variant IDs to their color/size combinations
+          // IMPORTANT: Update these with your actual variant IDs
           const variantMap = {
-            '42822037536846': { color: 'Black', size: 'M' },
-            '42822037405774': { color: 'Black', size: 'XS' },
-            // Add more mappings as needed
+            '42822037536846': { color: 'Black', size: 'M' },      // Black + M  
+            '42822037405774': { color: 'Black', size: 'XS' },     // Black + XS
+            // Add more mappings for other variants as needed
+            // To find variant IDs: check console when selecting different options
           };
+          
+          console.log('🗺️ Checking variant map for ID:', currentVariantId);
+          console.log('🗺️ Available mappings:', Object.keys(variantMap));
           
           const mappedVariant = variantMap[currentVariantId];
           if (mappedVariant) {
@@ -277,7 +297,7 @@ class ProductFormComponent extends Component {
             console.log('✅ Found variant in mapping:', mappedVariant);
           } else {
             console.log('❌ Variant ID not found in mapping:', currentVariantId);
-            console.log('💡 Available mapped variants:', Object.keys(variantMap));
+            console.log('💡 Add this to variantMap if needed:', `'${currentVariantId}': { color: '?', size: '?' }`);
           }
         }
         
@@ -346,6 +366,14 @@ class ProductFormComponent extends Component {
           console.log('🚀 AUTO-ADD TRIGGERED! Adding Soft Winter Jacket...');
           console.log('🎯 Matched condition:', matchedCondition.desc);
           
+          // Add a flag to prevent duplicate auto-adds
+          if (window.autoAddInProgress) {
+            console.log('⚠️ Auto-add already in progress, skipping...');
+            return;
+          }
+          
+          window.autoAddInProgress = true;
+          
           const fd = new FormData();
           fd.append('id', softWinterJacketVariantId);
           fd.append('quantity', '1');
@@ -356,14 +384,19 @@ class ProductFormComponent extends Component {
             url: Theme.routes.cart_add_url
           });
           
+          // Use a simpler fetch approach for the auto-add
           fetch(Theme.routes.cart_add_url, { 
-            ...fetchCfg, 
-            body: fd, 
-            headers: { ...fetchCfg.headers, Accept: 'application/json' } 
+            method: 'POST',
+            body: fd,
+            headers: { 
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
           })
           .then(res => {
             console.log('📡 Auto-add response status:', res.status);
             console.log('📡 Auto-add response ok:', res.ok);
+            
             if (!res.ok) {
               return res.text().then(text => {
                 console.error('❌ Auto-add failed - Response text:', text);
@@ -376,9 +409,13 @@ class ProductFormComponent extends Component {
             console.log('✅ Soft Winter Jacket auto-added successfully!');
             console.log('📦 Auto-add response:', res);
             
-            // Dispatch a custom event to update cart UI if needed
-            if (res && !res.status) {
-              console.log('🔄 Dispatching cart update event');
+            // Check if there was an error in the response
+            if (res.status) {
+              console.error('❌ Auto-add error:', res.message, res.description);
+            } else {
+              console.log('🎉 Auto-add completed successfully!');
+              
+              // Dispatch a custom event to update cart UI if needed
               document.dispatchEvent(new CustomEvent('cart:updated', { 
                 detail: { 
                   autoAdded: true, 
@@ -396,6 +433,13 @@ class ProductFormComponent extends Component {
               message: err.message,
               stack: err.stack
             });
+          })
+          .finally(() => {
+            // Clear the flag after a delay
+            setTimeout(() => {
+              window.autoAddInProgress = false;
+              console.log('🔄 Auto-add flag cleared');
+            }, 2000);
           });
         } else {
           console.log('❌ AUTO-ADD CONDITIONS NOT MET');
