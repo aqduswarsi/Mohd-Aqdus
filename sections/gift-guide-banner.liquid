@@ -3,16 +3,26 @@
   "name": "Gift Guide Banner",
   "settings": [
     {
-      "type": "text",
-      "id": "heading",
-      "label": "Heading",
-      "default": "Discover Joy: Your Ultimate Holiday Gift Destination."
+      "type": "image_picker",
+      "id": "background_image",
+      "label": "Background Image (Full Banner)"
+    },
+    {
+      "type": "image_picker",
+      "id": "side_image",
+      "label": "Side Image (Smaller Image)"
     },
     {
       "type": "text",
-      "id": "subheading",
-      "label": "Subheading",
-      "default": "Find the ideal gift for your loved ones."
+      "id": "title",
+      "label": "Main Title",
+      "default": "The Gift Guide"
+    },
+    {
+      "type": "text",
+      "id": "description",
+      "label": "Description",
+      "default": "Discover Joy: Your Ultimate Holiday Gift Destination. Explore our curated selection and find the perfect gifts to delight your loved ones this holiday season."
     },
     {
       "type": "text",
@@ -25,11 +35,6 @@
       "id": "button_link",
       "label": "Button Link",
       "default": "/collections/all"
-    },
-    {
-      "type": "image_picker",
-      "id": "background_image",
-      "label": "Background Image"
     }
   ],
   "presets": [
@@ -40,47 +45,91 @@
 }
 {% endschema %}
 
-<section class="gift-guide-banner" style="background-image: url({{ section.settings.background_image | img_url: '1600x' }});">
-  <div class="gift-guide-content">
-    <h2>{{ section.settings.heading }}</h2>
-    <p>{{ section.settings.subheading }}</p>
-    <a href="{{ section.settings.button_link }}" class="btn">
-      {{ section.settings.button_label }}
-    </a>
+<section class="gift-guide-banner">
+  <div class="gift-guide-wrapper">
+    <div class="gift-guide-left">
+      <h2 class="gift-guide-title">{{ section.settings.title }}</h2>
+      <p class="gift-guide-description">{{ section.settings.description }}</p>
+      <a href="{{ section.settings.button_link }}" class="gift-guide-btn">
+        {{ section.settings.button_label }}
+      </a>
+    </div>
+    <div class="gift-guide-right">
+      {% if section.settings.side_image %}
+        <img src="{{ section.settings.side_image | img_url: 'master' }}" alt="Gift Guide Side Image">
+      {% endif %}
+    </div>
   </div>
+
+  {% if section.settings.background_image %}
+    <div class="gift-guide-bg">
+      <img src="{{ section.settings.background_image | img_url: 'master' }}" alt="Gift Guide Background">
+    </div>
+  {% endif %}
 </section>
 
 <style>
 .gift-guide-banner {
   position: relative;
-  background-size: cover;
-  background-position: center;
-  padding: 80px 20px;
-  text-align: center;
-  color: #fff;
+  width: 100%;
+  overflow: hidden;
 }
 
-.gift-guide-content h2 {
-  font-size: 2rem;
-  font-weight: bold;
-  margin-bottom: 15px;
+.gift-guide-bg img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
-.gift-guide-content p {
-  font-size: 1.2rem;
-  margin-bottom: 25px;
+.gift-guide-wrapper {
+  position: absolute;
+  top: 177px; /* from Figma */
+  left: 376px; /* from Figma */
+  width: 1140px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
 }
 
-.gift-guide-content .btn {
+.gift-guide-left {
+  max-width: 600px;
+}
+
+.gift-guide-title {
+  font-family: 'Jost', sans-serif;
+  font-weight: 500;
+  font-size: 165px; /* from Figma */
+  line-height: 100%;
+  margin-bottom: 40px;
+  color: #000;
+}
+
+.gift-guide-description {
+  font-family: 'Jost', sans-serif;
+  font-weight: 400;
+  font-size: 47px; /* from Figma */
+  line-height: 140%;
+  margin-bottom: 40px;
+  color: #000;
+}
+
+.gift-guide-btn {
+  display: inline-block;
   background: #000;
   color: #fff;
-  padding: 12px 30px;
+  padding: 20px 60px;
+  font-size: 22px;
+  border-radius: 8px;
   text-decoration: none;
-  border-radius: 4px;
-  transition: background 0.3s ease;
+  transition: 0.3s ease;
 }
 
-.gift-guide-content .btn:hover {
+.gift-guide-btn:hover {
   background: #444;
+}
+
+.gift-guide-right img {
+  width: 600px; /* adjust based on side image */
+  margin-left: 100px;
 }
 </style>
