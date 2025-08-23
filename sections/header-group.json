@@ -125,7 +125,8 @@
         "heading": "Discover Joy: Your Ultimate Holiday Gift Destination.",
         "subheading": "Find the ideal gift for your loved ones.",
         "button_label": "Choose Gift",
-        "button_link": "shopify://collections/all"
+        "button_link": "shopify://collections/all",
+        "background_image": "shopify://shop_images/Frame.png"
       }
     }
   },
