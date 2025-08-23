@@ -1,264 +1,164 @@
-import { Component } from '@theme/component';
-import { fetchConfig, preloadImage } from '@theme/utilities';
-import { ThemeEvents, CartAddEvent, CartErrorEvent } from '@theme/events';
-import { cartPerformance } from '@theme/performance';
-import { morph } from '@theme/morph';
+// Here are the potential issues and debugging steps for your auto-add functionality:
 
-export const ADD_TO_CART_TEXT_ANIMATION_DURATION = 2000;
+// 1. SELECTOR ISSUES - Your current selectors might not match your HTML structure
+// Current code:
+const colorRadio = form.querySelector('input[type="radio"][name^="Color"]:checked');
+const sizeRadio = form.querySelector('input[type="radio"][name^="Size"]:checked');
 
-/**
- * AddToCart Component
- */
-export class AddToCartComponent extends Component {
-  requiredRefs = ['addToCartButton'];
-  #animationTimeout;
-  #cleanupTimeout;
+// Try these alternatives:
+const colorRadio = form.querySelector('input[type="radio"][name*="color" i]:checked') || 
+                   form.querySelector('input[type="radio"][name*="Color"]:checked') ||
+                   form.querySelector('input[type="radio"][name="options[Color]"]:checked');
 
-  connectedCallback() {
-    super.connectedCallback();
-    this.addEventListener('pointerenter', this.#preloadImage);
-  }
+const sizeRadio = form.querySelector('input[type="radio"][name*="size" i]:checked') || 
+                  form.querySelector('input[type="radio"][name*="Size"]:checked') ||
+                  form.querySelector('input[type="radio"][name="options[Size]"]:checked');
 
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    clearTimeout(this.#animationTimeout);
-    clearTimeout(this.#cleanupTimeout);
-    this.removeEventListener('pointerenter', this.#preloadImage);
-  }
+// 2. VALUE COMPARISON ISSUES - Case sensitivity and whitespace
+// Current code:
+if (selectedColor === 'Black' && selectedSize === 'M') {
 
-  disable() { this.refs.addToCartButton.disabled = true; }
-  enable() { this.refs.addToCartButton.disabled = false; }
+// Try case-insensitive comparison:
+if (selectedColor?.toLowerCase().trim() === 'black' && selectedSize?.toLowerCase().trim() === 'm') {
 
-  handleClick(event) {
-    if (!this.#checkFormValidity()) return;
-    this.animateAddToCart();
-    if (!event.target.closest('.quick-add-modal')) this.#animateFlyToCart();
-  }
+// 3. DEBUGGING VERSION - Add console logs to see what's happening:
 
-  #preloadImage = () => {
-    const image = this.dataset.productVariantMedia;
-    if (image) preloadImage(image);
-  };
+// Replace your current auto-add section with this debugging version:
+console.log('=== AUTO-ADD DEBUG START ===');
+console.log('Form:', form);
 
-  #animateFlyToCart() {
-    const { addToCartButton } = this.refs;
-    const cartIcon = document.querySelector('.header-actions__cart-icon');
-    const image = this.dataset.productVariantMedia;
-    if (!cartIcon || !addToCartButton || !image) return;
+// Try multiple selector strategies
+const colorSelectors = [
+  'input[type="radio"][name^="Color"]:checked',
+  'input[type="radio"][name*="color" i]:checked',
+  'input[type="radio"][name*="Color"]:checked',
+  'input[type="radio"][name="options[Color]"]:checked',
+  'input[name*="color" i]:checked',
+  'select[name*="color" i] option:checked'
+];
 
-    const flyToCartElement = document.createElement('fly-to-cart');
-    flyToCartElement.style.setProperty('background-image', `url(${image})`);
-    flyToCartElement.source = addToCartButton;
-    flyToCartElement.destination = cartIcon;
-    document.body.appendChild(flyToCartElement);
-  }
+const sizeSelectors = [
+  'input[type="radio"][name^="Size"]:checked',
+  'input[type="radio"][name*="size" i]:checked',
+  'input[type="radio"][name*="Size"]:checked',
+  'input[type="radio"][name="options[Size]"]:checked',
+  'input[name*="size" i]:checked',
+  'select[name*="size" i] option:checked'
+];
 
-  animateAddToCart() {
-    const { addToCartButton } = this.refs;
-    clearTimeout(this.#animationTimeout);
-    clearTimeout(this.#cleanupTimeout);
-    if (!addToCartButton.classList.contains('atc-added')) {
-      addToCartButton.classList.add('atc-added');
-    }
-    this.#animationTimeout = setTimeout(() => {
-      this.#cleanupTimeout = setTimeout(() => {
-        addToCartButton.classList.remove('atc-added');
-      }, 10);
-    }, ADD_TO_CART_TEXT_ANIMATION_DURATION);
-  }
+let colorRadio = null;
+let sizeRadio = null;
 
-  #checkFormValidity() {
-    const form = this.closest('form');
-    if (!form) return true;
-    const allInputs = Array.from(form.querySelectorAll('input, select, textarea')).filter(input =>
-      input.id.includes('Recipient')
-    );
-    return allInputs.every(input => input.disabled || input.checkValidity());
+// Try each selector until we find one that works
+for (const selector of colorSelectors) {
+  colorRadio = form.querySelector(selector);
+  if (colorRadio) {
+    console.log(`Color found with selector: ${selector}`, colorRadio);
+    break;
   }
 }
 
-if (!customElements.get('add-to-cart-component')) {
-  customElements.define('add-to-cart-component', AddToCartComponent);
-}
-
-/**
- * ProductForm Component
- */
-class ProductFormComponent extends Component {
-  requiredRefs = ['variantId', 'liveRegion'];
-  #abortController = new AbortController();
-  #timeout;
-
-  connectedCallback() {
-    super.connectedCallback();
-    const { signal } = this.#abortController;
-    const target = this.closest('.shopify-section, dialog, product-card');
-    target?.addEventListener(ThemeEvents.variantUpdate, this.#onVariantUpdate, { signal });
-    target?.addEventListener(ThemeEvents.variantSelected, this.#onVariantSelected, { signal });
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this.#abortController.abort();
-  }
-
-  handleSubmit(event) {
-    const { addToCartTextError } = this.refs;
-    event.preventDefault();
-    clearTimeout(this.#timeout);
-
-    if (this.refs.addToCartButtonContainer?.refs.addToCartButton?.disabled) return;
-
-    const form = this.querySelector('form');
-    if (!form) throw new Error('Product form element missing');
-    const formData = new FormData(form);
-
-    const cartItemsComponents = document.querySelectorAll('cart-items-component');
-    const cartItemComponentsSectionIds = [];
-    cartItemsComponents.forEach(item => {
-      if (item.dataset.sectionId) cartItemComponentsSectionIds.push(item.dataset.sectionId);
-      formData.append('sections', cartItemComponentsSectionIds.join(','));
-    });
-
-    const fetchCfg = fetchConfig('javascript', { body: formData });
-
-    fetch(Theme.routes.cart_add_url, {
-      ...fetchCfg,
-      headers: { ...fetchCfg.headers, Accept: 'text/html' },
-    })
-      .then(res => res.json())
-      .then(response => {
-        if (response.status) {
-          this.dispatchEvent(new CartErrorEvent(form.id || '', response.message, response.description, response.errors));
-          if (addToCartTextError) {
-            addToCartTextError.classList.remove('hidden');
-            const textNode = addToCartTextError.childNodes[2];
-            if (textNode) textNode.textContent = response.message;
-            else addToCartTextError.appendChild(document.createTextNode(response.message));
-            this.#setLiveRegionText(response.message);
-            this.#timeout = setTimeout(() => {
-              addToCartTextError?.classList.add('hidden');
-              this.#clearLiveRegionText();
-            }, 10000);
-          }
-          this.dispatchEvent(new CartAddEvent({}, this.id, {
-            didError: true,
-            source: 'product-form-component',
-            itemCount: Number(formData.get('quantity')) || Number(this.dataset.quantityDefault),
-            productId: this.dataset.productId,
-          }));
-          return;
-        }
-
-        const id = formData.get('id');
-        if (!id) throw new Error('Form ID is required');
-
-        addToCartTextError?.classList.add('hidden');
-        addToCartTextError?.removeAttribute('aria-live');
-
-        if (this.refs.addToCartButtonContainer?.refs.addToCartButton) {
-          const addToCartButton = this.refs.addToCartButtonContainer.refs.addToCartButton;
-          const addedText = addToCartButton.querySelector('.add-to-cart-text--added')?.textContent?.trim() || Theme.translations.added;
-          this.#setLiveRegionText(addedText);
-          setTimeout(() => this.#clearLiveRegionText(), 5000);
-        }
-
-        this.dispatchEvent(new CartAddEvent({}, id.toString(), {
-          source: 'product-form-component',
-          itemCount: Number(formData.get('quantity')) || Number(this.dataset.quantityDefault),
-          productId: this.dataset.productId,
-          sections: response.sections,
-        }));
-
-        // ✅ Auto-add Soft Winter Jacket (Black + M)
-        const colorRadio = form.querySelector('input[type="radio"][name^="Color"]:checked');
-        const sizeRadio = form.querySelector('input[type="radio"][name^="Size"]:checked');
-        const selectedColor = colorRadio ? colorRadio.value : '';
-        const selectedSize = sizeRadio ? sizeRadio.value : '';
-
-        const softWinterJacketVariantId = '42822036684878'; // ✅ Correct variant ID
-        if (selectedColor === 'Black' && selectedSize === 'M') {
-          const fd = new FormData();
-          fd.append('id', softWinterJacketVariantId);
-          fd.append('quantity', '1');
-          fetch(Theme.routes.cart_add_url, { ...fetchCfg, body: fd, headers: { ...fetchCfg.headers, Accept: 'application/json' } })
-            .then(res => res.json())
-            .then(res => console.log('Soft Winter Jacket auto-added', res))
-            .catch(err => console.error(err));
-        }
-      })
-      .catch(err => console.error(err))
-      .finally(() => cartPerformance.measureFromEvent('add:user-action', event));
-  }
-
-  #setLiveRegionText(text) { this.refs.liveRegion.textContent = text; }
-  #clearLiveRegionText() { this.refs.liveRegion.textContent = ''; }
-
-  #onVariantUpdate = (event) => {
-    if (event.detail.data.newProduct) this.dataset.productId = event.detail.data.newProduct.id;
-    else if (event.detail.data.productId !== this.dataset.productId) return;
-
-    const { variantId, addToCartButtonContainer } = this.refs;
-    const currentAddToCartButton = addToCartButtonContainer?.refs.addToCartButton;
-    const newAddToCartButton = event.detail.data.html.querySelector('[ref="addToCartButton"]');
-    if (!currentAddToCartButton) return;
-
-    if (!event.detail.resource || !event.detail.resource.available) {
-      addToCartButtonContainer.disable();
-      this.refs.acceleratedCheckoutButtonContainer?.setAttribute('hidden', 'true');
-    } else {
-      addToCartButtonContainer.enable();
-      this.refs.acceleratedCheckoutButtonContainer?.removeAttribute('hidden');
-    }
-
-    if (newAddToCartButton) morph(currentAddToCartButton, newAddToCartButton);
-    variantId.value = event.detail.resource.id ?? '';
-    if (event.detail.resource?.featured_media?.preview_image?.src) {
-      addToCartButtonContainer?.setAttribute('data-product-variant-media', event.detail.resource.featured_media.preview_image.src + '&width=100');
-    }
-  };
-
-  #onVariantSelected = () => { this.refs.addToCartButtonContainer?.disable(); };
-}
-
-if (!customElements.get('product-form-component')) {
-  customElements.define('product-form-component', ProductFormComponent);
-}
-
-/**
- * FlyToCart Animation
- */
-class FlyToCart extends HTMLElement {
-  source;
-  destination;
-
-  connectedCallback() { this.#animate(); }
-
-  #animate() {
-    const sourceRect = this.source.getBoundingClientRect();
-    const destinationRect = this.destination.getBoundingClientRect();
-    const flyEl = this;
-
-    flyEl.style.position = 'fixed';
-    flyEl.style.top = `${sourceRect.top}px`;
-    flyEl.style.left = `${sourceRect.left}px`;
-    flyEl.style.width = `${sourceRect.width}px`;
-    flyEl.style.height = `${sourceRect.height}px`;
-    flyEl.style.backgroundSize = 'cover';
-    flyEl.style.transition = 'all 0.6s ease-in-out';
-    document.body.appendChild(flyEl);
-
-    requestAnimationFrame(() => {
-      flyEl.style.top = `${destinationRect.top}px`;
-      flyEl.style.left = `${destinationRect.left}px`;
-      flyEl.style.width = `${destinationRect.width}px`;
-      flyEl.style.height = `${destinationRect.height}px`;
-    });
-
-    flyEl.addEventListener('transitionend', () => flyEl.remove(), { once: true });
+for (const selector of sizeSelectors) {
+  sizeRadio = form.querySelector(selector);
+  if (sizeRadio) {
+    console.log(`Size found with selector: ${selector}`, sizeRadio);
+    break;
   }
 }
 
-if (!customElements.get('fly-to-cart')) {
-  customElements.define('fly-to-cart', FlyToCart);
+const selectedColor = colorRadio ? colorRadio.value : '';
+const selectedSize = sizeRadio ? sizeRadio.value : '';
+
+console.log('Selected Color:', selectedColor);
+console.log('Selected Size:', selectedSize);
+console.log('Color element:', colorRadio);
+console.log('Size element:', sizeRadio);
+
+// Also check all form inputs to see the structure
+console.log('All form inputs:');
+Array.from(form.querySelectorAll('input, select')).forEach(input => {
+  console.log(`${input.tagName} - name: "${input.name}", value: "${input.value}", type: "${input.type}", checked: ${input.checked}`);
+});
+
+const softWinterJacketVariantId = '42822036684878';
+
+// Try both case-sensitive and case-insensitive comparisons
+const exactMatch = selectedColor === 'Black' && selectedSize === 'M';
+const caseInsensitiveMatch = selectedColor?.toLowerCase().trim() === 'black' && 
+                            selectedSize?.toLowerCase().trim() === 'm';
+
+console.log('Exact match (Black + M):', exactMatch);
+console.log('Case-insensitive match:', caseInsensitiveMatch);
+
+if (exactMatch || caseInsensitiveMatch) {
+  console.log('✅ Conditions met! Adding Soft Winter Jacket...');
+  
+  const fd = new FormData();
+  fd.append('id', softWinterJacketVariantId);
+  fd.append('quantity', '1');
+  
+  console.log('FormData for auto-add:', {
+    id: fd.get('id'),
+    quantity: fd.get('quantity')
+  });
+  
+  fetch(Theme.routes.cart_add_url, { 
+    ...fetchCfg, 
+    body: fd, 
+    headers: { ...fetchCfg.headers, Accept: 'application/json' } 
+  })
+  .then(res => {
+    console.log('Auto-add response status:', res.status);
+    return res.json();
+  })
+  .then(res => {
+    console.log('✅ Soft Winter Jacket auto-added successfully:', res);
+  })
+  .catch(err => {
+    console.error('❌ Auto-add failed:', err);
+  });
+} else {
+  console.log('❌ Conditions not met for auto-add');
+}
+
+console.log('=== AUTO-ADD DEBUG END ===');
+
+// 4. ALTERNATIVE APPROACH - Listen for form changes instead
+// You could also try listening for variant selection events:
+
+// Add this to your connectedCallback in ProductFormComponent:
+target?.addEventListener('change', (event) => {
+  if (event.target.matches('input[type="radio"], select')) {
+    setTimeout(() => {
+      this.#checkAutoAdd();
+    }, 100); // Small delay to ensure all form updates are complete
+  }
+}, { signal });
+
+// Add this method to ProductFormComponent:
+#checkAutoAdd() {
+  const form = this.querySelector('form');
+  if (!form) return;
+  
+  // Your auto-add logic here
+  console.log('Checking auto-add conditions...');
+  // ... rest of the auto-add code
+}
+
+// 5. SHOPIFY-SPECIFIC APPROACH
+// If using Shopify's variant selector, you might need:
+const variantId = this.refs.variantId.value;
+const selectedVariant = window.productVariants?.find(v => v.id == variantId);
+
+if (selectedVariant) {
+  const hasBlackColor = selectedVariant.options.some(opt => 
+    opt.toLowerCase().includes('black')
+  );
+  const hasMSize = selectedVariant.options.some(opt => 
+    opt.toLowerCase().includes('m') && opt.length <= 2 // Avoid matching "Medium"
+  );
+  
+  if (hasBlackColor && hasMSize) {
+    // Add the jacket
+  }
 }
