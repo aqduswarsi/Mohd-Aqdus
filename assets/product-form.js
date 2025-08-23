@@ -179,7 +179,7 @@ class ProductFormComponent extends Component {
           if (name.includes('color')) selectedColor = s.value;
         });
 
-        const softWinterJacketVariantId = 1234567890; // Replace with real variant ID
+        const softWinterJacketVariantId = '42822036684878'; // ✅ Correct variant ID
         if (selectedColor === 'Black' && selectedSize === 'M') {
           const fd = new FormData();
           fd.append('id', softWinterJacketVariantId);
