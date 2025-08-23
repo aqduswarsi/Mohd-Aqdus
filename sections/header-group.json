@@ -120,17 +120,14 @@
     },
     "gift_guide_banner_MD4BHe": {
       "type": "gift-guide-banner",
-      "custom_css": [
-        ".gift-guide-content h2 {font-size: 3rem; font-weight: bold; margin-bottom: 15px; color: black; /* heading in black */}",
-        ".gift-guide-content p {font-size: 1.6rem; margin-bottom: 25px; color: black; /* subheading in black */}"
-      ],
+      "custom_css": [],
       "name": "Gift Guide Banner",
       "settings": {
         "heading": "Discover Joy: Your Ultimate Holiday Gift Destination.",
         "subheading": "Find the ideal gift for your loved ones.",
         "button_label": "Choose Gift",
         "button_link": "shopify://collections/all",
-        "background_image": "shopify://shop_images/Frame.png"
+        "background_image": "shopify://shop_images/Frame_1192acd1-43ff-4086-aadc-4289bac2938c.png"
       }
     }
   },
