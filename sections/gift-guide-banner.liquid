@@ -1,0 +1,87 @@
+{% schema %}
+{
+  "name": "Gift Guide Banner",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Discover Joy: Your Ultimate Holiday Gift Destination."
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Find the ideal gift for your loved ones."
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button Label",
+      "default": "Choose Gift"
+    },
+    {
+      "type": "url",
+      "id": "button_link",
+      "label": "Button Link",
+      "default": "/collections/all"
+    },
+    {
+      "type": "image_picker",
+      "id": "background_image",
+      "label": "Background Image"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Gift Guide Banner"
+    }
+  ]
+}
+{% endschema %}
+
+<section class="gift-guide-banner" style="background-image: url({{ section.settings.background_image | img_url: '1600x' }});">
+  <div class="gift-guide-content">
+    <h2>{{ section.settings.heading }}</h2>
+    <p>{{ section.settings.subheading }}</p>
+    <a href="{{ section.settings.button_link }}" class="btn">
+      {{ section.settings.button_label }}
+    </a>
+  </div>
+</section>
+
+<style>
+.gift-guide-banner {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.gift-guide-content h2 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: black; /* heading in black */
+}
+
+.gift-guide-content p {
+  font-size: 1.2rem;
+  margin-bottom: 25px;
+  color: black; /* subheading in black */
+}
+
+.gift-guide-content .btn {
+  background: #000;
+  color: #fff;
+  padding: 12px 30px;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.gift-guide-content .btn:hover {
+  background: #444;
+}
+</style>
